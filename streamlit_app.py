@@ -35,7 +35,7 @@ with st.sidebar:
     st.caption(f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # ── Main area ────────────────────────────────────────────────
-st.title("📊 Sample Streamlit Dashboard")
+st.title("📊 Sample Streamlit Dashboard By creator")
 st.markdown("A quick demo of common Streamlit widgets and charts.")
 
 # Tabs
