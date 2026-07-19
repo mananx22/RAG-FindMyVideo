@@ -5,14 +5,12 @@ python-dotenv
 streamlit
 langchain_huggingface
 sentence_transformers
-# for document loaders, splitters,chains
 langchain 
 langchain-chroma
 chromadb
 pysqlite3-binary
 langchain_community
 langchain_groq
-# youtube dependencies
 youtube-transcript-api<1.2.0
 pytubefix
 nodejs_wheel
