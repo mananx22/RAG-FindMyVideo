@@ -86,7 +86,7 @@ with tab1:
                 # ── Fetch video metadata via pytubefix ─────────────────
                 
                 yt = YouTube(user_input)
-                video_title  = yt.title or "Unknown Title"
+                video_title  = yt.title or "Unknown  Title"
                 video_author = yt.author or "Unknown Author"                
 
                 # ── Build LangChain Document ────────────────────────────
