@@ -1,21 +1,29 @@
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-# ADD THIS: Trick LangChain into using pytubefix whenever it asks for pytube
+# Trick LangChain into using pytubefix whenever it asks for pytube
 import pytubefix
 sys.modules['pytube'] = pytubefix
 
 from dotenv import load_dotenv
 load_dotenv()
+import os
 import re
 import streamlit as st
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chat_models import init_chat_model
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_community.document_loaders import YoutubeLoader, DirectoryLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from pytubefix import YouTube
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
+
+# ── Build proxy config from environment variables ──────────────────────────
+_proxy_user = os.getenv("PROXY_USERNAME", "")
+_proxy_pass = os.getenv("PROXY_PASSWORD", "")
+_proxy_host = os.getenv("PROXY_HOST", "")
+_proxy_port = os.getenv("PROXY_PORT", "80")
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
@@ -69,16 +77,28 @@ with tab1:
                     st.stop()
                 video_id = video_id_match.group(1)
 
-                loader = YoutubeLoader.from_youtube_url(
-                    youtube_url=user_input,
-                    add_video_info=True,
-                    language=["en"],
-                )
-                docs = loader.load()
+                # ── Fetch transcript via proxy ──────────────────────────
+                
+                ytt_api = YouTubeTranscriptApi(proxy_config=_proxy_config)
+                transcript_list = ytt_api.fetch(video_id)
+                    
 
-                if not docs:
-                    st.error("Could not load transcript for this video.")
-                    st.stop()
+                # ── Fetch video metadata via pytubefix ─────────────────
+                
+                yt = YouTube(user_input)
+                video_title  = yt.title or "Unknown Title"
+                video_author = yt.author or "Unknown Author"                
+
+                # ── Build LangChain Document ────────────────────────────
+                doc = Document(
+                    page_content=transcript_text,
+                    metadata={
+                        "source": video_id,
+                        "title": video_title,
+                        "author": video_author,
+                        "url": user_input,
+                    },
+                )
 
                 text_splitter = RecursiveCharacterTextSplitter(
                     chunk_size=100,
@@ -87,11 +107,9 @@ with tab1:
                     length_function=len,
                 )
 
-                chunks = text_splitter.split_documents(docs)
+                chunks = text_splitter.split_documents([doc])
                 vectorstore.add_documents(chunks)
 
-                video_title = docs[0].metadata.get("title", "Unknown Title")
-                video_author = docs[0].metadata.get("author", "Unknown Author")
                 st.success(f"Your Video: **{video_title}** from channel **{video_author}** has been saved to Vector DB successfully.")
         else:
             st.warning("Please add some text")
