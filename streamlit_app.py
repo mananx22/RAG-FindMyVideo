@@ -1,112 +1,97 @@
-"""Sample Streamlit App — Single Page Dashboard
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# ADD THIS: Trick LangChain into using pytubefix whenever it asks for pytube
+import pytubefix
+sys.modules['pytube'] = pytubefix
 
-Run with:
-    streamlit run streamlit_app.py
-"""
-
+from dotenv import load_dotenv
+load_dotenv()
+import re
 import streamlit as st
-import pandas as pd
-import numpy as np
-import time
-from datetime import datetime, timedelta
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.chat_models import init_chat_model
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from langchain_community.document_loaders import YoutubeLoader, DirectoryLoader, TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from pytubefix import YouTube
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="Sample Dashboard",
-    page_icon="📊",
+    page_title="RAG-FindMyVideo",
+    page_icon="🔍",
     layout="wide",
 )
 
-# ── Sidebar ──────────────────────────────────────────────────
-with st.sidebar:
-    st.title("⚙️ Controls")
-    st.markdown("---")
+@st.cache_resource
+def load_embeddings():
+    return HuggingFaceEmbeddings(model_name="ibm-granite/granite-embedding-small-english-r2")
 
-    chart_type = st.selectbox(
-        "Chart type",
-        ["Line", "Bar", "Area"],
+embeddings = load_embeddings()
+
+@st.cache_resource
+def load_llm():
+    return init_chat_model("groq:llama-3.1-8b-instant")
+llm = load_llm()
+
+@st.cache_resource
+def load_vectorstore():
+    return Chroma(
+        collection_name="acquired_videos",
+        embedding_function=embeddings,
+        persist_directory="./chroma_db",
+
+    )
+vectorstore = load_vectorstore()
+
+# 3. UI Layout
+st.title("🔮 Text to Embeddings Converter")
+st.write("Type or paste your text below to convert it into a numerical vector embedding.")
+
+# Text input box (Text area allows for multi-line input)
+tab1, tab2 = st.tabs(["🔍 Query","📥 Store"])
+
+with tab1:
+    st.subheader("Add Video to Vector DB")
+    user_input = st.text_area(
+        label="Input Text", 
+        placeholder="Paste url to save as vectors...",
+        height=150
     )
 
-    n_points = st.slider("Data points", 10, 200, 50, step=10)
+    if st.button("Save Video"):
+        if user_input.strip():
+            with st.spinner("Fetching transcript and generating embeddings..."):
+                video_id_match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", user_input)
+                if not video_id_match:
+                    st.error("Invalid YouTube URL.")
+                    st.stop()
+                video_id = video_id_match.group(1)
 
-    show_raw = st.checkbox("Show raw data", value=False)
+                loader = YoutubeLoader.from_youtube_url(
+                    youtube_url=user_input,
+                    add_video_info=True,
+                    language=["en"],
+                )
+                docs = loader.load()
 
-    st.markdown("---")
-    st.caption(f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                if not docs:
+                    st.error("Could not load transcript for this video.")
+                    st.stop()
 
-# ── Main area ────────────────────────────────────────────────
-st.title("📊 Sample Streamlit Dashboard By creator")
-st.markdown("A quick demo of common Streamlit widgets and charts.")
+                text_splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=100,
+                    separators=["\n", ".", " "],
+                    chunk_overlap=25,
+                    length_function=len,
+                )
 
-# Tabs
-tab1, tab2, tab3 = st.tabs(["📈 Chart", "📋 Data", "ℹ️ About"])
+                chunks = text_splitter.split_documents(docs)
+                vectorstore.add_documents(chunks)
 
-# ── Tab 1: Chart ─────────────────────────────────────────────
-with tab1:
-    st.subheader(f"{chart_type} Chart")
-
-    # Generate random time-series data
-    dates = [datetime.now() - timedelta(days=i) for i in range(n_points)]
-    dates.reverse()
-    values = np.cumsum(np.random.randn(n_points)) + 50
-
-    df = pd.DataFrame({"Date": dates, "Value": values})
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Latest", f"{values[-1]:.1f}", f"{values[-1] - values[-2]:+.1f}")
-    col2.metric("Mean", f"{np.mean(values):.1f}")
-    col3.metric("Std Dev", f"{np.std(values):.1f}")
-
-    if chart_type == "Line":
-        st.line_chart(df, x="Date", y="Value")
-    elif chart_type == "Bar":
-        st.bar_chart(df, x="Date", y="Value")
-    else:
-        st.area_chart(df, x="Date", y="Value")
-
-# ── Tab 2: Data ──────────────────────────────────────────────
-with tab2:
-    st.subheader("Raw Data")
-
-    if show_raw:
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Download CSV",
-            csv,
-            "data.csv",
-            "text/csv",
-        )
-    else:
-        st.info("👈 Enable **Show raw data** in the sidebar to see the table.")
-
-    # Interactive filter demo
-    st.subheader("Filter Demo")
-    filter_val = st.slider("Minimum value", float(df["Value"].min()), float(df["Value"].max()), float(df["Value"].min()))
-    filtered = df[df["Value"] >= filter_val]
-    st.write(f"Rows above {filter_val:.1f}: **{len(filtered)}** of {len(df)}")
-    st.dataframe(filtered, use_container_width=True, hide_index=True)
-
-# ── Tab 3: About ─────────────────────────────────────────────
-with tab3:
-    st.subheader("About This App")
-    st.markdown("""
-    This is a minimal **Streamlit** demo showcasing:
-
-    - 📊 **Charts** — line, bar, and area charts via `st.line_chart`, `st.bar_chart`, `st.area_chart`
-    - 📋 **DataFrames** — interactive tables with `st.dataframe`
-    - 🎛️ **Widgets** — select boxes, sliders, checkboxes, metrics
-    - 📑 **Tabs** — organizing content with `st.tabs`
-    - ⬇️ **Download** — CSV export button
-    - 📐 **Layout** — sidebar, columns, wide mode
-
-    Run it with:
-    ```
-    streamlit run streamlit_app.py
-    ```
-    """)
-
-# ── Footer ───────────────────────────────────────────────────
-st.markdown("---")
-st.caption("Built with ❤️ using Streamlit")
+                video_title = docs[0].metadata.get("title", "Unknown Title")
+                video_author = docs[0].metadata.get("author", "Unknown Author")
+                st.success(f"Your Video: **{video_title}** from channel **{video_author}** has been saved to Vector DB successfully.")
+        else:
+            st.warning("Please add some text")
