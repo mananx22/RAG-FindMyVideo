@@ -54,17 +54,17 @@ def load_vectorstore():
 vectorstore = load_vectorstore()
 
 # 3. UI Layout
-st.title("🔮 Find your video through Semantic Search")
-st.write("Go ahead! Give YT video url and let's find video without giving video name!")
+st.title("Find your video through Semantic Search 🔮")
+# st.write("Go ahead! Give YT video url and let's find video without giving video name!")
 
 # Text input box (Text area allows for multi-line input)
 tab1, tab2 = st.tabs(["📥 Store","🔍 Query"])
 
 with tab1:
-    st.subheader("Add Video Transcript to Vector DB")
+    st.subheader("Go ahead! Give YT video url and let's find video without giving video name!")
     user_input = st.text_area(
         label="Input Text", 
-        placeholder="Paste url to save as vectors...",
+        placeholder="Paste YT video url to save as vectors...",
         height=150
     )
 
