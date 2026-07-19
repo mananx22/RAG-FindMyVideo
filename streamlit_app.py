@@ -54,14 +54,14 @@ def load_vectorstore():
 vectorstore = load_vectorstore()
 
 # 3. UI Layout
-st.title("🔮 Text to Embeddings Converter")
-st.write("Type or paste your text below to convert it into a numerical vector embedding.")
+st.title("🔮 Find your video through Semantic Search")
+st.write("Go ahead! Give YT video url and let's find video without giving video name!")
 
 # Text input box (Text area allows for multi-line input)
 tab1, tab2 = st.tabs(["📥 Store","🔍 Query"])
 
 with tab1:
-    st.subheader("Add Video to Vector DB")
+    st.subheader("Add Video Transcript to Vector DB")
     user_input = st.text_area(
         label="Input Text", 
         placeholder="Paste url to save as vectors...",
@@ -110,6 +110,6 @@ with tab1:
                 chunks = text_splitter.split_documents([doc])
                 vectorstore.add_documents(chunks)
 
-                st.success(f"Your Video: **{video_title}** from channel **{video_author}** has been saved to Vector DB successfully.")
+                st.success(f"Your Video: **{video_title}** from channel **{video_author}** has been saved to Vector DB successfully. Proceed to query section. ask questions about video to search it!")
         else:
-            st.warning("Please add some text")
+            st.warning("Give one YT video url only within text area.")
