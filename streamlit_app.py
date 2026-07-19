@@ -58,7 +58,7 @@ st.title("🔮 Text to Embeddings Converter")
 st.write("Type or paste your text below to convert it into a numerical vector embedding.")
 
 # Text input box (Text area allows for multi-line input)
-tab1, tab2 = st.tabs(["🔍 Query","📥 Store"])
+tab1, tab2 = st.tabs(["📥 Store","🔍 Query"])
 
 with tab1:
     st.subheader("Add Video to Vector DB")
